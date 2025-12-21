@@ -1,0 +1,106 @@
+import { useState, useEffect } from 'react'
+import { Routes, Route, Link, useLocation } from 'react-router-dom'
+import apiClient from '../../api/client'
+import Card from '../../components/ui/Card/Card'
+import Button from '../../components/ui/Button/Button'
+import StatusBadge from '../../components/ui/StatusBadge/StatusBadge'
+import KanbanBoard from '../../components/tasks/KanbanBoard'
+import { Plus } from 'lucide-react'
+import type { Task, Project } from '../../types'
+
+export default function Tasks() {
+  return (
+    <Routes>
+      <Route index element={<TasksList />} />
+      <Route path="kanban" element={<KanbanBoard />} />
+    </Routes>
+  )
+}
+
+function TasksList() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const location = useLocation()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [tasksRes, projectsRes] = await Promise.all([
+          apiClient.get('/tasks/?my_tasks=true'),
+          apiClient.get('/tasks/projects/'),
+        ])
+        setTasks(tasksRes.data.results || tasksRes.data)
+        setProjects(projectsRes.data.results || projectsRes.data)
+      } catch (error) {
+        console.error('Error fetching tasks:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-64">Загрузка...</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Задачи</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">Управление задачами и проектами</p>
+        </div>
+        <div className="flex space-x-3">
+          <Link to="/tasks/kanban">
+            <Button variant="secondary">Kanban</Button>
+          </Link>
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Новая задача
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {tasks.map((task) => (
+          <Card key={task.id} variant="elevated" className="hover:shadow-lg transition-shadow">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {task.title}
+                </h3>
+                {task.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                    {task.description.replace(/<[^>]*>/g, '')}
+                  </p>
+                )}
+                <div className="flex items-center space-x-4 mt-4">
+                  <StatusBadge status={task.status} />
+                  <StatusBadge status={task.priority} />
+                  {task.project && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {task.project.name}
+                    </span>
+                  )}
+                  {task.due_date && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      До: {new Date(task.due_date).toLocaleDateString('ru-RU')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {tasks.length === 0 && (
+          <Card variant="outlined" className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">Нет задач</p>
+          </Card>
+        )}
+      </div>
+    </div>
+  )
+}
+
